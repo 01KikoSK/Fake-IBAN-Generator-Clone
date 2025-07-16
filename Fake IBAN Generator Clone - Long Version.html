@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fake IBAN Generator Clone - Long Version</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f5f7fa;
+    padding: 20px;
+    max-width: 900px;
+    margin: auto;
+  }
+  h1 {
+    color: #243b55;
+  }
+  label, select, input, button {
+    font-size: 1.1em;
+  }
+  select, input {
+    padding: 8px;
+    width: 120px;
+    margin: 0 10px 10px 0;
+  }
+  button {
+    background-color: #4a90e2;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  button:hover {
+    background-color: #357ABD;
+  }
+  #ibanOutput {
+    width: 100%;
+    font-size: 1.2em;
+    padding: 10px;
+    margin-top: 15px;
+    border: 2px solid #4a90e2;
+    border-radius: 4px;
+    font-family: monospace;
+  }
+  .note {
+    margin-top: 20px;
+    font-size: 0.9em;
+    color: gray;
+  }
+</style>
+</head>
+<body>
+
+<h1>Fake IBAN Generator Clone</h1>
+
+<p>Select a country and click <strong>Generate IBAN</strong> to create a fake but formally valid IBAN number.</p>
+
+<label for="countrySelect">Country:</label>
+<select id="countrySelect" aria-label="Select country code for IBAN">
+  <!-- Only a subset for demonstration -->
+  <option value="DE" data-length="22">Germany (DE) - 22 chars</option>
+  <option value="GB" data-length="22">United Kingdom (GB) - 22 chars</option>
+  <option value="FR" data-length="27">France (FR) - 27 chars</option>
+  <option value="ES" data-length="24">Spain (ES) - 24 chars</option>
+  <option value="NL" data-length="18">Netherlands (NL) - 18 chars</option>
+  <option value="IT" data-length="27">Italy (IT) - 27 chars</option>
+  <option value="BE" data-length="16">Belgium (BE) - 16 chars</option>
+  <option value="CH" data-length="21">Switzerland (CH) - 21 chars</option>
+  <option value="PL" data-length="28">Poland (PL) - 28 chars</option>
+  <option value="AT" data-length="20">Austria (AT) - 20 chars</option>
+</select>
+
+<button id="generateBtn">Generate IBAN</button>
+
+<input type="text" id="ibanOutput" readonly aria-live="polite" aria-label="Generated IBAN number" />
+
+<p class="note">
+  This generator creates fake IBANs for testing only. They follow country-specific IBAN length and checksum formats but do not relate to real bank accounts.
+</p>
+
+<script>
+/**
+ * Rearranges and converts IBAN string for checksum calculation.
+ * According to IBAN standard: Move country code and checksum digits to the end,
+ * then replace letters with numbers (A=10, B=11, ..., Z=35).
+ * @param {string} ibanRaw - IBAN with placeholder checksum (use '00' as checksum)
+ * @returns {string} number string used for mod-97 operation
+ */
+function prepareIbanForChecksum(ibanRaw) {
+  // Move first 4 chars to end
+  const rearranged = ibanRaw.slice(4) + ibanRaw.slice(0, 4);
+  // Convert letters to numbers: A=10,...Z=35
+  return rearranged.toUpperCase().split('')
+    .map(ch => {
+      if (ch >= 'A' && ch <= 'Z') {
+        return (ch.charCodeAt(0) - 55).toString();
+      } else {
+        return ch;
+      }
+    }).join('');
+}
+
+/**
+ * Calculates IBAN checksum digits according to ISO 13616.
+ * checksum = 98 - (numericIBAN mod 97)
+ * @param {string} ibanRaw - IBAN with checksum digits as "00"
+ * @returns {string} checksum 2 digits as string
+ */
+function calculateChecksum(ibanRaw) {
+  const numericIban = prepareIbanForChecksum(ibanRaw);
+  // Compute mod 97 using big integer mod trick
+  let remainder = '';
+  for (let i = 0; i < numericIban.length; i++) {
+    remainder = (remainder + numericIban[i]) % 97;
+  }
+  const checksum = 98 - remainder;
+  return checksum.toString().padStart(2, '0');
+}
+
+/**
+ * Generates a random alphanumeric string (uppercase letters + digits)
+ * @param {number} length length of string to generate
+ * @returns {string} random string
+ */
+function randomAlphanumeric(length) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i=0; i<length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Generates a fake IBAN for given country code and length.
+ * This version uses random alphanumeric for BBAN part.
+ * @param {string} countryCode - ISO 2-letter uppercase country code
+ * @param {number} totalLength - total IBAN length for that country
+ * @returns {string} generated IBAN with valid checksum
+ */
+function generateFakeIban(countryCode, totalLength) {
+  // IBAN = CC + 2 digits (checksum) + BBAN
+  // length of BBAN = totalLength - 4
+  const bbanLength = totalLength - 4;
+  // Generate random BBAN chars (alphanumeric: letters and digits)
+  const bban = randomAlphanumeric(bbanLength);
+  // Start with checksum 00 placeholder
+  let iban = countryCode + '00' + bban;
+  // Calculate correct checksum
+  const checksum = calculateChecksum(iban);
+  // Replace checksum digits in IBAN
+  iban = countryCode + checksum + bban;
+  return iban;
+}
+
+document.getElementById('generateBtn').addEventListener('click', () => {
+  const select = document.getElementById('countrySelect');
+  const countryCode = select.value;
+  const length = parseInt(select.options[select.selectedIndex].dataset.length, 10);
+  const iban = generateFakeIban(countryCode, length);
+  // Format IBAN as groups of 4 chars separated by space for readability
+  const formattedIban = iban.match(/.{1,4}/g).join(' ');
+  const output = document.getElementById('ibanOutput');
+  output.value = formattedIban;
+  output.focus();
+  output.select();
+});
+</script>
+
+</body>
+</html>
